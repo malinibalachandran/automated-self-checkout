@@ -1,25 +1,31 @@
-# Automated Self Checkout
+# Automated Self-Checkout
 
 ![CodeQL](https://github.com/intel-retail/automated-self-checkout/actions/workflows/codeql.yaml/badge.svg?branch=main) ![GolangTest](https://github.com/intel-retail/automated-self-checkout/actions/workflows/gotest.yaml/badge.svg?branch=main) ![DockerImageBuild](https://github.com/intel-retail/automated-self-checkout/actions/workflows/build.yaml/badge.svg?branch=main)  [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/intel-retail/automated-self-checkout/badge)](https://api.securityscorecards.dev/projects/github.com/intel-retail/automated-self-checkout)
 
-## Documentation
 
-- [Open source code for setup, install, and execution of software, with complete developer documentation](https://intel-retail.github.io/automated-self-checkout/)
-- [Developer focused website to enable developers to engage and build our partner community](https://www.intel.com/content/www/us/en/developer/articles/reference-implementation/automated-self-checkout.html)
-- [LinkedIn blog illustrating the automated self checkout use case more in detail](https://www.linkedin.com/pulse/retail-innovation-unlocked-open-source-vision-enabled-mohideen/)
+## Overview
 
-## Known issues
 
-- Once barcode is detected and decoded, barcode label text is displayed inside the object even if barcode is not visible.
-- Overlapping object detection label (gvatrack adds its own labels)
+The Automated Self-Checkout Retail Reference Implementation provides critical components required to build and deploy automated self-checkout solutions using Intel® hardware, software, and other open source software ingredients. This reference implementation is not meant to be a complete solution but is an open source initiative, providing evidence of hardware and software components needed to drive critical components of vision workloads.
 
-## Disclaimer
+Using this reference implementation, you can decide on the required hardware by minimizing the cost per vision stream and accelerate the development of software with the core building blocks on offer.
 
-GStreamer is an open source framework licensed under LGPL. See https://gstreamer.freedesktop.org/documentation/frequently-asked-questions/licensing.html?gi-language=c.  You are solely responsible for determining if your use of Gstreamer requires any additional licenses.  Intel is not responsible for obtaining any such licenses, nor liable for any licensing fees due, in connection with your use of Gstreamer.
+
+## Learn More
+
+-  Follow step-by-step instructions to set up, install, and execute the software in [Documentation](https://intel-retail.github.io/automated-self-checkout/).
+-  Engage with the developer and partner communities using the [Intel Developer Zone](https://www.intel.com/content/www/us/en/developer/articles/reference-implementation/ai-computer-vision-checkout.html).
+- Know more about Automated Self-Checkout in this [LinkedIn blog](https://www.linkedin.com/pulse/retail-innovation-unlocked-open-source-vision-enabled-mohideen/).
+
+_______________
+
+#### Disclaimer
+
+GStreamer is an open source framework licensed under LGPL. See [Licensing your application](https://gstreamer.freedesktop.org/documentation/frequently-asked-questions/licensing.html?gi-language=c).  You are solely responsible for determining if your use of Gstreamer requires any additional licenses.  Intel is not responsible for obtaining any such licenses, nor liable for any licensing fees due, in connection with your use of Gstreamer.
 
 Certain third-party software or hardware identified in this document only may be used upon securing a license directly from the third-party software or hardware owner. The identification of non-Intel software, tools, or services in this document does not constitute a sponsorship, endorsement, or warranty by Intel.
 
-## Datasets & Models Disclaimer:
+#### Datasets and Models Disclaimer:
 
 To the extent that any data, datasets or models are referenced by Intel or accessed using tools or code on this site such data, datasets and models are provided by the third party indicated as the source of such content. Intel does not create the data, datasets, or models, provide a license to any third-party data, datasets, or models referenced, and does not warrant their accuracy or quality.  By accessing such data, dataset(s) or model(s) you agree to the terms associated with that content and that your use complies with the applicable license.
 
