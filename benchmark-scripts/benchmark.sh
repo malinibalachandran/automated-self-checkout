@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2023 Intel Corporation.
 #
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: Apache-2.0
 #
 
 error() {
@@ -13,7 +13,8 @@ error() {
 show_help() {
         echo "
          usage: $0 
-           --pipelines NUMBER_OF_PIPELINES | --stream_density TARGET_FPS  
+           --performance_mode the system performance setting [powersave | performance]
+           --pipelines NUMBER_OF_PIPELINES | --stream_density TARGET_FPS 
            --logdir FULL_PATH_TO_DIRECTORY 
            --duration SECONDS (not needed when --stream_density is specified)
            --init_duration SECONDS 
@@ -22,17 +23,21 @@ show_help() {
            [--classification_disabled] 
            [ --ocr_disabled | --ocr [OCR_INTERVAL OCR_DEVICE] ] 
            [ --barcode_disabled | --barcode [BARCODE_INTERVAL] ]
-           [realsense_enabled]
+           [--realsense_enabled]
 
          Note: 
           1. dgpu.x should be replaced with targetted GPUs such as dgpu (for all GPUs), dgpu.0, dgpu.1, etc
           2. filesrc will utilize videos stored in the sample-media folder
           3. Set environment variable STREAM_DENSITY_MODE=1 for starting single container stream density testing
           4. Set environment variable RENDER_MODE=1 for displaying pipeline and overlay CV metadata
+          5. Stream density can take two parameters: first one is for target fps, a float type value, and
+             the second one is increment integer of pipelines and is optional (in which case the increments will be dynamically adjusted internally)
         "
 }
 
 OPTIONS_TO_SKIP=0
+PERFORMANCE_MODE=powersave
+DOCKER_RUN_ARGS=""
 
 get_options() {
     while :; do
@@ -40,6 +45,18 @@ get_options() {
         -h | -\? | --help)
           show_help
           exit
+        ;;
+        --performance_mode)
+          if [ -z "$2" ]; then
+            break
+          fi
+          
+          if [ "$2" == "powersave" ] || [ "$2" == "performance" ]; then
+            PERFORMANCE_MODE="$2"
+          fi
+          echo "performance_mode: $PERFORMANCE_MODE"
+          OPTIONS_TO_SKIP=$(( OPTIONS_TO_SKIP + 1 ))
+          shift
         ;;
         --pipelines)
           if [ -z "$2" ]; then
@@ -53,12 +70,20 @@ get_options() {
           ;;
         --stream_density)
           if [ -z "$2" ]; then
-            error 'ERROR: "--stream_density" requires an integer.'        
+            error 'ERROR: "--stream_density" requires an integer for target fps.'
           fi
-            
+
+          STREAM_DENSITY_INCREMENTS=""
           PIPELINE_COUNT=1
           STREAM_DENSITY_FPS=$2
-          echo "stream_density: $STREAM_DENSITY_FPS"
+          if [[ "$3" =~ ^--.* ]]; then
+            echo "INFO: --stream_density no increment number configured; will be dynamically adjusted internally"
+          else
+            STREAM_DENSITY_INCREMENTS=$3
+            OPTIONS_TO_SKIP=$(( $OPTIONS_TO_SKIP + 1 ))
+            shift
+          fi
+          echo "stream_density: target fps = $STREAM_DENSITY_FPS  increments = $STREAM_DENSITY_INCREMENTS"
           OPTIONS_TO_SKIP=$(( $OPTIONS_TO_SKIP + 1 ))
           shift
           ;;
@@ -92,15 +117,15 @@ get_options() {
           echo "init_duration: $COMPLETE_INIT_DURATION"
           shift
           ;;
-        -?*)
-            break
-            ;;
+        --*)
+          DOCKER_RUN_ARGS="$DOCKER_RUN_ARGS $1"
+          ;;
         ?*)
-            break
-            ;;
+          DOCKER_RUN_ARGS="$DOCKER_RUN_ARGS $1"
+          ;;
         *)
-            break
-            ;;
+          break
+          ;;
         esac
 
         OPTIONS_TO_SKIP=$(( $OPTIONS_TO_SKIP + 1 ))
@@ -131,11 +156,15 @@ get_options "$@"
 
 # load docker-run params
 shift $OPTIONS_TO_SKIP
+# the following syntax for arguments is meant to be re-splitting for correctly used on all $DOCKER_RUN_ARGS
+# shellcheck disable=SC2068
+set -- $@ $DOCKER_RUN_ARGS
+echo "arguments passing to get-optons.sh" "$@"
 source ../get-options.sh "$@"
 
 # set performance mode
 echo "Setting scaling_governor to perf mode"
-echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+echo "$PERFORMANCE_MODE" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 
 # clean log directory that is being reused
 if [ -d $LOG_DIRECTORY ]; then rm -Rf $LOG_DIRECTORY; fi
@@ -184,25 +213,25 @@ do
   cd ../
 #  pwd
 
-  echo "DEBUG: docker-run.sh $@"
+  echo "DEBUG: docker-run.sh" "$@"
 
-  for i in $( seq 0 $(($PIPELINE_COUNT - 1)) )
+  for pipelineIdx in $( seq 0 $(($PIPELINE_COUNT - 1)) )
   do
     if [ -z "$STREAM_DENSITY_FPS" ]; then 
       #pushd ..
-      echo "Starting pipeline$i"
+      echo "Starting pipeline$pipelineIdx"
       if [ "$CPU_ONLY" != 1 ] && ([ "$HAS_FLEX_140" == 1 ] || [ "$HAS_FLEX_170" == 1 ])
       then
           if [ "$NUM_GPU" != 0 ]
           then
-            gpu_index=$(expr $i % $NUM_GPU)
+            gpu_index=$(expr $pipelineIdx % $NUM_GPU)
             # replacing the value of --platform with dgpu.$gpu_index for flex case
             orig_args=("$@")
             for ((i=0; i < $#; i++))
             do
               if [ "${orig_args[i]}" == "--platform" ]
               then
-                arrgpu=(${orig_args[i+1]//./ })
+                IFS=" " read -r -a arrgpu <<< "${orig_args[i+1]//./ }"
                 TARGET_GPU_NUMBER=${arrgpu[1]}
                 if [ -z "$TARGET_GPU_NUMBER" ] || [ "$distributed" == 1 ]; then
                   set -- "${@:1:i+1}" "dgpu.$gpu_index" "${@:i+3}"
@@ -211,21 +240,21 @@ do
                 break
               fi
             done
-            LOW_POWER=$LOW_POWER ./docker-run.sh "$@"
+            LOW_POWER=$LOW_POWER DEVICE=$DEVICE ./docker-run.sh "$@"
           else
             echo "Error: NUM_GPU is 0, cannot run"
             exit 1
           fi
       else
-          CPU_ONLY=$CPU_ONLY LOW_POWER=$LOW_POWER ./docker-run.sh "$@"
+          CPU_ONLY=$CPU_ONLY LOW_POWER=$LOW_POWER DEVICE=$DEVICE ./docker-run.sh "$@"
       fi
       sleep 1
       #popd
     else
       echo "Starting stream density benchmarking"
       #cleanup any residual containers
-      sids=($(docker ps  --filter="name=vision-self-checkout" -q -a))
-      if [ -z "$sids" ]
+      mapfile -t sids < <(docker ps  --filter="name=automated-self-checkout" -q -a)
+      if [ "${#sids[@]}" -eq 0 ]
       then
         echo "no dangling docker containers to clean up"
       else
@@ -240,11 +269,13 @@ do
       #pushd ..
       #echo "Cur dir: `pwd`"
       # Sync sleep in stream density script and platform metrics data collection script
-      CPU_ONLY=$CPU_ONLY LOW_POWER=$LOW_POWER COMPLETE_INIT_DURATION=$COMPLETE_INIT_DURATION STREAM_DENSITY_FPS=$STREAM_DENSITY_FPS STREAM_DENSITY_MODE=1 ./docker-run.sh "$@"
+      CPU_ONLY=$CPU_ONLY LOW_POWER=$LOW_POWER COMPLETE_INIT_DURATION=$COMPLETE_INIT_DURATION \
+      STREAM_DENSITY_FPS=$STREAM_DENSITY_FPS STREAM_DENSITY_INCREMENTS=$STREAM_DENSITY_INCREMENTS \
+      STREAM_DENSITY_MODE=1 DEVICE=$DEVICE ./docker-run.sh "$@"
       #popd
     fi
   done
-  cd -
+  cd - || { echo "ERROR: failed to change back the previous directory"; exit 1; }
 
   echo "Waiting for init duration to complete..."
   sleep $COMPLETE_INIT_DURATION
@@ -269,21 +300,66 @@ do
         echo "Waiting $DURATION seconds for workload to finish"
   else
         echo "Waiting for workload(s) to finish..."
-        sids=$(docker ps  --filter="name=vision-self-checkout" -q -a)
-        stream_workload_running=`echo "$sids" | wc -w`
-   
-        while [ 1 == 1 ]
+        waitingMsg=1
+        ovmsCase=0
+        # figure out which case we are running like either "model-server" or "automated-self-checkout" container
+        mapfile -t sids < <(docker ps  -f name=automated-self-checkout -f status=running -q -a)
+        stream_workload_running=$(echo "${sids[@]}" | wc -w)
+        if (( $(echo "$stream_workload_running" 0 | awk '{if ($1 == $2) print 1;}') ))
+        then
+          # if we don't find any docker container running for dlstreamer (i.e. name with automated-self-checkout)
+          # then it is ovms running case
+          echo "running ovms client case..."
+          ovmsCase=1
+        else
+          echo "running dlstreamer case..."
+        fi
+
+        # keep looping through until stream density script is done
+        while true
         do
-          sleep 1
-          sids=$(docker ps  --filter="name=vision-self-checkout" -q -a)
-          #echo "sids: $sids"
-          stream_workload_running=`echo "$sids" | wc -w`
-          #echo "stream workload_running: $stream_workload_running"
-          if (( $(echo $stream_workload_running 0 | awk '{if ($1 == $2) print 1;}') ))
+          if [ $ovmsCase -eq 1 ]
           then
-                  #echo "DEBUG: quitting.."
+            stream_density_running=$(docker exec ovms-client0 bash -c 'ps -aux | grep "stream_density_framework-pipelines.sh" | grep -v grep')
+            if [ -z "$stream_density_running" ]
+            then
+              # when stream density script process is done, we need to kill the ovms-client0 container as it keeps running forever
+              echo "killing ovms-client0 docker container..."
+              docker rm ovms-client0 -f
+              break
+            else
+              if [ $waitingMsg -eq 1 ]
+              then
+                echo "stream density script is still running..."
+                waitingMsg=0
+              fi
+            fi
+          else
+            # since there is no longer --rm automatically remove docker-run containers
+            # we want to remove those first if any:
+            exitedIds=$(docker ps  -f name=automated-self-checkout -f status=exited -q -a)
+            if [ -n "$exitedIds" ]
+            then
+              docker rm "$exitedIds"
+            fi
+
+            mapfile -t sids < <(docker ps  --filter="name=automated-self-checkout" -q -a)
+            #echo "sids: " "${sids[@]}"
+            stream_workload_running=$(echo "${sids[@]}" | wc -w)
+            #echo "stream workload_running: $stream_workload_running"
+            if (( $(echo "$stream_workload_running" 0 | awk '{if ($1 == $2) print 1;}') ))
+            then
                   break
+            else
+              if [ $waitingMsg -eq 1 ]
+              then
+                echo "stream density script is still running..."
+                waitingMsg=0
+              fi
+            fi
           fi
+          # there are still some pipeline running containers, waiting for them to be finished...
+          sleep 1
         done
   fi
 
@@ -291,12 +367,24 @@ do
   if [ -e ../results/r0.jsonl ]
   then
     sudo ./copy-platform-metrics.sh $LOG_DIRECTORY
-    sudo python3 ./results_parser.py >> meta_summary.txt
+    python3 ./results_parser.py | sudo tee -a meta_summary.txt > /dev/null
     sudo mv meta_summary.txt $LOG_DIRECTORY
   fi
 
 
  sleep 2
+
+ # before kill the process check if it is already gone
+ if ps -p $log_time_monitor_pid > /dev/null
+ then
+    kill -9 $log_time_monitor_pid
+    while ps -p $log_time_monitor_pid > /dev/null
+    do
+		  echo "$log_time_monitor_pid is still running"
+		  sleep 1
+    done
+ fi
+ 
  ./stop_server.sh
  sleep 5
 

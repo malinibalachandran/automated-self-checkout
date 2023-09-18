@@ -12,8 +12,8 @@ Benchmark scripts are containerized inside Docker. The following table lists the
 
 | Platform                                   | Docker Build Command      | Check Success                                |
 | ------------------------------------------ | ------------------------- |----------------------------------------------|
-| Intel integrated GPUs | <pre>cd benchmark-scripts<br>make build-benchmark<br>make build-igt</pre> | Docker images command to show both <b>`benchmark:dev`</b> and <b>`benchmark:igt`</b> images |
-| Intel discrete GPUs   | <pre>cd benchmark-scripts<br>make build-benchmark<br>make build-xpu</pre> | Docker images command to show both <b>`benchmark:dev`</b> and <b>`benchmark:xpu`</b> images |
+| Intel® integrated and Arc™ GPUs | <pre>cd benchmark-scripts<br>make build-benchmark<br>make build-igt</pre> | Docker images command to show both <b>`benchmark:dev`</b> and <b>`benchmark:igt`</b> images |
+| Intel® Flex GPUs   | <pre>cd benchmark-scripts<br>make build-benchmark<br>make build-xpu</pre> | Docker images command to show both <b>`benchmark:dev`</b> and <b>`benchmark:xpu`</b> images |
 
 **_Note:_** Build command may take a while, depending on your internet connection and machine specifications.
 
@@ -26,6 +26,8 @@ Before running pipeline benchmark for a specific use case, determine the followi
 
 - [Input source type](./pipelinebenchmarking.md#input-source-type)
 - [Platform](./pipelinebenchmarking.md#platform)
+- [Workload](./pipelinebenchmarking.md#workload)
+- [Profile for opencv-OVMS workload](./pipelinebenchmarking.md#benchmark-specified-profile)
 
 #### Input Source Type
 
@@ -68,7 +70,6 @@ The benchmark script can take either of the following video input sources:
     - `--platform dgpu` will evenly distribute and utilize all available dgpus
 
 ---
-
 ### Benchmark Specified Number of Pipelines
 
 The primary purpose of benchmarking with a specified number of pipelines is to discover the performance and system requirements for a given use case.
@@ -81,6 +82,8 @@ sudo ./benchmark.sh --pipelines <number of pipelines> --logdir <output dir>/data
 ```
 
 where, the configurable input parameters include: 
+
+- `--performance_mode` configures the scaling governor of the system. Supported modes are performance and powersave (default).
 - `--logdir` configures the benchmarking output directory
 - `--duration` configures the duration, in number of seconds, the benchmarking will run
 - `--init_duration` configures the duration, in number of seconds, to wait for system initialization before the benchmarking metrics or data collection begins
@@ -124,7 +127,31 @@ sudo ./benchmark.sh --stream_density <target FPS> --logdir <output dir>/data --i
 ```
 **_Note:_** It is recommended to set ``--stream_density`` to a value lesser than your target FPS to account for real world variances in hardware readings.
 
+**_NOTE:_** Because stream density requires a continuous video stream it is recommended to use an RTSP stream, USB camera, or RealSense camera. If these options are not available you can use the [camera simulator](#appendix-benchmark-helper-scripts) to continuously loop through a video file as an RTSP stream.
+
 ---
+
+#### Workload
+We are currently supporting 2 types of workloads:
+    1. dlstreamer
+    2. opencv-ovms
+
+These are the input value for `--workload` parameter for benchmark.sh script. The default value for `--workload` parameter is `dlstreamer` in case it is not provided when running benchmark.sh script.
+
+#### Benchmark Specified Profile for Opencv-ovms
+For running opencv-ovms workload, we are supporting different programming languages and different models. You may specify [language choice](./OVMS/supportingDifferentLanguage.md) and [model input](./OVMS/supportingDifferentModel.md). Then you may **prefix** benchmark script run command with specific profile.
+
+An example of stream density benchmark script in golang:
+```bash
+PIPELINE_PROFILE="grpc_go" sudo -E ./benchmark.sh --stream_density 14.9 --logdir mytest/data --duration 60 --init_duration 20 --platform core --inputsrc rtsp://127.0.0.1:8554/camera_0 --workload opencv-ovms
+```
+
+An example of stream density benchmark script in python:
+```bash
+PIPELINE_PROFILE="grpc_python" sudo -E ./benchmark.sh --stream_density 14.9 --logdir mytest/data --duration 60 --init_duration 60 --platform core --inputsrc rtsp://127.0.0.1:8554/camera_0 --workload opencv-ovms
+```
+If prefix is not provided, then the default value is "grpc_python".
+
 ## Additional Benchmark Examples
 
 **Run decode+pre-processing+object detection (Yolov5s 416x416) only pipeline**:
