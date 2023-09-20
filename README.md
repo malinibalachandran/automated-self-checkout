@@ -6,10 +6,9 @@
 ## Overview
 
 
-The Automated Self-Checkout Retail Reference Implementation provides critical components required to build and deploy automated self-checkout solutions using Intel® hardware, software, and other open source software ingredients. This reference implementation is not meant to be a complete solution but is an open source initiative, providing evidence of hardware and software components needed to drive critical components of vision workloads.
+The Automated Self-Checkout Retail Reference Implementation provides critical components required to build and deploy automated self-checkout solutions using Intel® hardware, software, and other open source software ingredients. This reference implementation provides a pre-configured automated self-checkout pipeline optimized for Intel® hardware.
 
-Using this reference implementation, you can decide on the required hardware by minimizing the cost per vision stream and accelerate the development of software with the core building blocks on offer.
-
+Note that this reference implementation is not meant to be a complete solution but is an open source initiative, providing evidence of hardware and software components needed to drive critical components of vision workloads.
 
 ## Learn More
 
@@ -19,6 +18,11 @@ Using this reference implementation, you can decide on the required hardware by 
 
 _______________
 
+**Note**: This reference implementation uses Intel® Deep Learning Streamer (Intel® DL Streamer), and the following are some of the known issues:
+
+- Once a barcode is detected and decoded, the barcode label text is displayed inside the object even if the barcode is not visible.
+- Object detection label overlaps (gvatrack adds its own labels).
+________________
 #### Disclaimer
 
 GStreamer is an open source framework licensed under LGPL. See [Licensing your application](https://gstreamer.freedesktop.org/documentation/frequently-asked-questions/licensing.html?gi-language=c).  You are solely responsible for determining if your use of Gstreamer requires any additional licenses.  Intel is not responsible for obtaining any such licenses, nor liable for any licensing fees due, in connection with your use of Gstreamer.
